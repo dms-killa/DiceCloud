@@ -422,3 +422,16 @@ non-D&D game system using only the Library system. Results drive priority decisi
 - **Blocker identified:** Injection Point #12 (Stats Tab Layout) → drove Mod 8 promotion to P1
 - **Artifacts:** `scripts/insert-coc7e-library.js`, `docs/vibe-hack-coc-results.md`
 - **Priority changes:** See `docs/proposed-refactors.md` "Vibe Hack Validation" section for full rationale
+
+### VH-003b: The Expanse — Ship Combat Tracking
+
+- **Date:** 2026-02-28
+- **Goal:** Test ship-as-creature pattern for crew-driven combat tracking
+- **Key design decision:** Ships as separate DiceCloud creatures (type: 'npc', gameSystem: 'expanse-ship') rather than a subsystem of character sheets
+- **Pattern:** Crew ability scores copied to ship-level stats → ship actions reference ship stats → all rolls visible on ship sheet during combat
+- **What worked:** Loss conditions as toggles with effects (exactly mirrors personal Conditions pattern). Derived attack TNs (11 + sensors) as stat formulas. `expanse-ship` system tabs give clean Ship Systems / Combat / Crew Roles layout without D&D clutter (Spells, Inventory tabs hidden). Effect propagation works — toggling "Sensors Damaged" reduces sensors by 2, which auto-updates Attack TN from 14 to 12.
+- **What needed workarounds:** Crew-to-ship stat linking is manual copy pre-combat (no automated link between creatures). EW Points and Damage Control Advanced Test accumulation tracked on paper. Range band tracked as a number with no weapon availability enforcement.
+- **Result:** ~90% functional — ship combat is fully playable with paper-tracking for 3 mechanics
+- **Artifacts:** `scripts/insert-expanse-ship-library.js`, `scripts/create-expanse-sample-ship.js`, `docs/expanse-playtest-guide.md`
+- **UI changes:** `CharacterSheet.vue` — added `expanse-ship` system tab layout; `CreatureForm.vue` — added dropdown option
+- **Next step:** VH-004 BitD — will require first custom property type (Clocks)

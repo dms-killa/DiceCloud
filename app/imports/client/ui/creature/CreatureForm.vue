@@ -220,6 +220,7 @@ export default {
         { label: 'Pathfinder 2e', value: 'pf2e' },
         { label: 'Blades in the Dark', value: 'bitd' },
         { label: 'Ironsworn', value: 'ironsworn' },
+        { label: 'The Expanse — Ship', value: 'expanse-ship' },
       ],
     }
   },

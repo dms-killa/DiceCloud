@@ -131,7 +131,21 @@ export default {
     // TODO: Allow game system libraries to add new tabs (requires Mod 1 gameSystem field first)
     // TODO: Hide D&D-specific sections within the Stats tab (separate follow-up)
     visibleTabs() {
-      const allTabs = [
+      const gameSystem = this.creature?.gameSystem;
+
+      // System-specific tab configurations
+      const systemTabs = {
+        'expanse-ship': [
+          { id: 'stats',    label: 'Ship Systems', icon: 'mdi-rocket',           component: 'StatsTab',    show: true },
+          { id: 'actions',  label: 'Combat',       icon: 'mdi-crosshairs-gps',   component: 'ActionsTab',  show: true },
+          { id: 'features', label: 'Crew Roles',   icon: 'mdi-account-group',    component: 'FeaturesTab', show: true },
+          { id: 'journal',  label: 'Ship Log',     icon: 'mdi-notebook',         component: 'JournalTab',  show: true },
+          { id: 'build',    label: 'Build',        icon: 'mdi-wrench',           component: 'BuildTab',    show: true },
+          { id: 'tree',     label: 'Tree',         icon: 'mdi-file-tree',        component: 'TreeTab',     show: !!this.creature?.settings?.showTreeTab },
+        ],
+      };
+
+      const allTabs = systemTabs[gameSystem] || [
         {
           id: 'stats',
           label: 'Stats',
@@ -194,6 +208,7 @@ export default {
     // Cache key for v-tabs-items: forces re-render when visibility changes
     tabsKey() {
       return '' +
+        this.creature?.gameSystem +
         this.creature?.settings?.hideSpellsTab +
         this.creature?.settings?.showTreeTab;
     },
