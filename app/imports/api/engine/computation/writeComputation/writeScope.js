@@ -6,18 +6,9 @@ export default function writeScope(creatureId, computation) {
   if (!creatureId) throw 'creatureId is required';
   const scope = computation.scope;
   let variables = computation.variables;
-  // If the variables are not set, check if they can be fetched
+  // If the variables are not set, fetch or default to empty
   if (!variables) {
-    variables = CreatureVariables.findOne({
-      _creatureId: creatureId
-    });
-  }
-  // Otherwise create a new variables document
-  if (!variables) {
-    CreatureVariables.insert({
-      _creatureId: creatureId
-    });
-    variables = {};
+    variables = CreatureVariables.findOne({ _creatureId: creatureId }) || {};
   }
   delete variables._id;
   delete variables._creatureId;
@@ -75,7 +66,7 @@ export default function writeScope(creatureId, computation) {
     const update = {};
     if ($set) update.$set = $set;
     if ($unset) update.$unset = $unset;
-    CreatureVariables.update({ _creatureId: creatureId }, update);
+    CreatureVariables.upsert({ _creatureId: creatureId }, update);
   }
   if (computation.creature?.dirty) {
     Creatures.update({ _id: creatureId }, { $unset: { dirty: 1 } });
