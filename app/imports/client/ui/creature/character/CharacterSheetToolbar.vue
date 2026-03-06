@@ -122,10 +122,7 @@
       >
         <v-tabs
           v-if="creature && creature.settings"
-          :key=" '' +
-            creature.settings.hideSpellsTab +
-            creature.settings.showTreeTab
-          "
+          :key="tabsKey"
           class="flex"
           style="min-width: 0"
           centered
@@ -139,29 +136,11 @@
             {id: $route.params.id, tab: e}
           )"
         >
-          <v-tab>
-            Stats
-          </v-tab>
-          <v-tab>
-            Actions
-          </v-tab>
-          <v-tab v-if="!creature.settings.hideSpellsTab">
-            Spells
-          </v-tab>
-          <v-tab>
-            Inventory
-          </v-tab>
-          <v-tab>
-            Features
-          </v-tab>
-          <v-tab>
-            Journal
-          </v-tab>
-          <v-tab>
-            Build
-          </v-tab>
-          <v-tab v-if="creature.settings.showTreeTab">
-            Tree
+          <v-tab
+            v-for="tab in visibleTabs"
+            :key="tab.id"
+          >
+            {{ tab.label }}
           </v-tab>
         </v-tabs>
         <v-spacer />
@@ -198,6 +177,52 @@ export default {
   computed: {
     creatureId() {
       return this.$route.params.id;
+    },
+    visibleTabs() {
+      const system = this.creature?.gameSystem;
+      const SYSTEM_TABS = {
+        coc7e: [
+          { id: 'stats',     label: 'Investigator' },
+          { id: 'actions',   label: 'Actions'      },
+          { id: 'inventory', label: 'Possessions'  },
+          { id: 'features',  label: 'Backstory'    },
+          { id: 'journal',   label: 'Journal'      },
+          { id: 'build',     label: 'Build'        },
+        ],
+        expanse: [
+          { id: 'stats',     label: 'Character' },
+          { id: 'actions',   label: 'Actions'   },
+          { id: 'inventory', label: 'Gear'      },
+          { id: 'features',  label: 'Talents'   },
+          { id: 'journal',   label: 'Backstory' },
+          { id: 'build',     label: 'Build'     },
+        ],
+        'expanse-ship': [
+          { id: 'stats',    label: 'Ship Systems' },
+          { id: 'actions',  label: 'Combat'       },
+          { id: 'features', label: 'Crew Roles'   },
+          { id: 'journal',  label: 'Ship Log'     },
+          { id: 'build',    label: 'Build'        },
+        ],
+      };
+      const DEFAULT_TABS = [
+        { id: 'stats',     label: 'Stats'     },
+        { id: 'actions',   label: 'Actions'   },
+        { id: 'spells',    label: 'Spells',   show: !this.creature?.settings?.hideSpellsTab },
+        { id: 'inventory', label: 'Inventory' },
+        { id: 'features',  label: 'Features'  },
+        { id: 'journal',   label: 'Journal'   },
+        { id: 'build',     label: 'Build'     },
+        { id: 'tree',      label: 'Tree',     show: !!this.creature?.settings?.showTreeTab },
+      ];
+      const tabs = SYSTEM_TABS[system] ?? DEFAULT_TABS;
+      return tabs.filter(t => t.show !== false);
+    },
+    tabsKey() {
+      return '' +
+        this.creature?.gameSystem +
+        this.creature?.settings?.hideSpellsTab +
+        this.creature?.settings?.showTreeTab;
     },
     toolbarColor() {
       if (this.creature && this.creature.color) {
