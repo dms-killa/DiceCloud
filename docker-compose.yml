@@ -16,11 +16,12 @@ services:
       context: ./
     environment:
     #update ROOT_URL, PORT, and MAIL_URL for your environment
-      - ROOT_URL=http://localhost:3000
-      - MONGO_URL=mongodb://meteor:meteor@dicecloud-db:27017
+      - ROOT_URL=http://mediaroom.lan:4000
+      - MONGO_URL=mongodb://meteor:meteor@dicecloud-db:27017/test?authSource=admin
       - PORT=3000
       - NODE_ENV=production
       - METEOR_SETTINGS={"public":{"environment":"production","disablePatreon":true}}
       - MAIL_URL=smtp://EMAIL:PASSWORD@SERVER:PORT
+      - DEFAULT_LIBRARIES=dslPyPFcULEH4kKOE,wAb7GUFHJpzINOjvU
     ports:
-      - '3000:3000' #The internal port should match the port set in the environmental variables
+      - '4000:3000' #The internal port should match the port set in the environmental variables

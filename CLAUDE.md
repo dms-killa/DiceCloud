@@ -93,21 +93,27 @@ App runs at `http://localhost:3000/`. The example settings file disables Patreon
 ### Running with Docker Compose
 
 ```bash
-docker-compose up --build
+docker compose up --build -d
+docker compose up -d   # restart without rebuild (e.g. after config change)
 ```
+
+> **CRITICAL:** `--build` rebuilds the image but does **not** replace a running container.
+> Always follow a rebuild with `docker compose up -d` to recreate containers with the new image.
+> **Symptom of missing this:** code fix is committed and image rebuilt, but behavior in the app is unchanged.
+> **Diagnosis:** `docker inspect dicecloud --format='{{.Image}}'` vs `docker images` — SHA mismatch means old container is still running.
 
 This starts MongoDB and the app. Patreon is disabled by default in the Docker config.
 
 ### Environment Variables
 
-| Variable | Purpose |
-|----------|---------|
-| `ROOT_URL` | Public URL of the app |
-| `MONGO_URL` | MongoDB connection string |
-| `MONGO_OPLOG_URL` | MongoDB oplog URL (for real-time reactivity) |
-| `MAIL_URL` | SMTP URL for email sending |
-| `METEOR_SETTINGS` | JSON config (see below) |
-| `DEFAULT_LIBRARIES` | Comma-separated library IDs subscribed by default |
+| Variable | Purpose | Notes |
+|----------|---------|-------|
+| `ROOT_URL` | Public URL of the app | Must match the actual hostname:port users access — DDP subscriptions fail silently on mismatch |
+| `MONGO_URL` | MongoDB connection string | **Must include DB name and authSource:** `mongodb://user:pass@host:27017/test?authSource=admin` — without DB name Meteor defaults to `test`; without `authSource=admin` auth fails on container restart |
+| `MONGO_OPLOG_URL` | MongoDB oplog URL (for real-time reactivity) | |
+| `MAIL_URL` | SMTP URL for email sending | |
+| `METEOR_SETTINGS` | JSON config (see below) | |
+| `DEFAULT_LIBRARIES` | Comma-separated library IDs subscribed by default | IDs must exist in the database the app is actually connecting to |
 
 ### Disabling Patreon
 
@@ -176,7 +182,7 @@ app/
 │   │   │   │   │       └── computeAttribute.js                # Attribute w/o variable name
 │   │   │   │   └── writeComputation/
 │   │   │   │       ├── writeAlteredProperties.ts
-│   │   │   │       └── writeScope.ts
+│   │   │   │       └── writeScope.js
 │   │   │   └── action/
 │   │   │       ├── tasks/
 │   │   │       │   ├── applyResetTask.ts          # ★ Rest system (short/long)
@@ -208,7 +214,8 @@ app/
 │   ├── client/ui/
 │   │   ├── vueSetup.js                    # Vue + Vuetify + Router setup
 │   │   ├── creature/character/
-│   │   │   ├── CharacterSheet.vue         # ★ Main character sheet (tabs)
+│   │   │   ├── CharacterSheet.vue         # ★ Main character sheet (tab content router)
+│   │   │   ├── CharacterSheetToolbar.vue  # ★ App bar + tab label bar (must stay in sync with CharacterSheet.vue)
 │   │   │   └── characterSheetTabs/
 │   │   │       ├── StatsTab.vue           # ★ Stats display (D&D layout)
 │   │   │       ├── ActionsTab.vue
@@ -249,7 +256,7 @@ app/
 | Modify effect operations | `Effects.ts` (schema), `aggregateEffect.js` (aggregation), `getAggregatorResult.js` (resolution) |
 | Change rest behavior | `applyResetTask.ts` |
 | Modify default new character | `defaultCharacterProperties.js` |
-| Add character sheet tab | `CharacterSheet.vue` |
+| Add character sheet tab | `CharacterSheet.vue` AND `CharacterSheetToolbar.vue` (both must stay in sync — mismatch causes tab index bugs) |
 | Modify damage types | `DAMAGE_TYPES.js` |
 | Change parser/formula syntax | `grammar.ne`, rebuild with Nearley |
 
@@ -393,6 +400,18 @@ See [docs/proposed-refactors.md](docs/proposed-refactors.md) for detailed before
 - **Dependency loops:** The engine detects cycles in the dependency graph and reports them as errors rather than infinite-looping
 - **Max property count:** Creatures with >1000 properties generate a warning
 
+### Quick Diagnostics
+
+| Symptom | Diagnosis / Fix |
+|---------|-----------------|
+| Properties exist in DB but invisible on sheet | `db.creatureProperties.aggregate([{$group:{_id:{col:'$root.collection'},count:{$sum:1}}}])` — any `root.collection: 'libraries'` entries are orphans; delete with `db.creatureProperties.deleteMany({'root.collection':'libraries'})` |
+| "crash" / blank page on load | Check browser console for `navigator.serviceWorker` TypeError — means app is on HTTP and serviceWorker guard is missing |
+| Code fix committed but behavior unchanged | `docker inspect dicecloud --format='{{.Image}}'` vs `docker images` — SHA mismatch means `docker compose up -d` was not run after rebuild |
+| Character sheet not recomputing after DB fix | `db.creatures.updateMany({}, {$set: {dirty: true}})` |
+| Library insert sets `gameSystem` but no stats appear | Creature has correct `gameSystem` but only 4 default props — ruleset content is missing; re-fill the Ruleset slot on the Build tab |
+| "Deactivated by ancestor" on roll actions | Expected — child `roll` nodes inside `action` properties are always marked inactive by the engine (they execute on use, not as standing computations); the action itself is active |
+| Short/Long rest buttons showing on non-D&D sheet | Set `creature.settings.hideRestButtons: true` — done automatically since VH-004 fix when Ruleset is inserted |
+
 ### Known Technical Debt
 
 - **Typo in code:** `computeVariableAsSkill.js:81` has `prop.bassiveBonus -= 5` (should be `prop.passiveBonus -= 5`) -- this is a dead code path since `prop.passiveBonus` is correctly set at line 70, so the typo-ed line is unreachable in the advantage branch but wrong in the disadvantage branch. The correct field was already set.
@@ -400,6 +419,13 @@ See [docs/proposed-refactors.md](docs/proposed-refactors.md) for detailed before
 - **Magic number 0.49:** Used for "half proficiency rounded down" throughout computation code; should be a named constant
 - **Hardcoded `'constitution'` string:** In `linkTypeDependencies.js:111` and `computeVariableAsAttribute.js` for hit dice dependency
 - **Hardcoded `'proficiencyBonus'` string:** In 5+ computation files for skill/calculation proficiency lookups
+
+### Fixed Bugs (Important to Know)
+
+- **[FIXED] `insertPropertyFromLibraryNode.js` — wrong root after `renewDocIds`:** `renewDocIds` only remaps IDs present in `docArray`. The library document itself is not in the array, so `root.id` remained pointing at the library after the call, making all inserted properties invisible to creature queries. Fixed by adding `nodes.forEach(n => { n.root = root; })` and `node.parentId = parentId` after the `renewDocIds` call. This was a bug in the original upstream code. If you ever see creature properties exist in the DB but not appear on the sheet, check `db.creatureProperties.aggregate([{$group:{_id:{col:'$root.collection'},count:{$sum:1}}}])` — properties with `root.collection: 'libraries'` are orphaned.
+- **[FIXED] `writeScope.js` — E11000 race condition on concurrent compute:** Two concurrent compute runs could both pass the `findOne` check and both try to `insert` the initial `creatureVariables` document, causing a duplicate key error. Fixed by changing `findOne + insert + update` to `findOne || {}` and using `upsert` for the final write.
+- **[FIXED] `serviceWorker.js` — crash on HTTP (non-localhost):** `navigator.serviceWorker` is `undefined` on HTTP (only available in secure contexts: HTTPS or localhost). The uncaught TypeError crashed the entire Meteor startup chain before Vue mounted, showing "crash" in the UI with a blank page. Fixed with `if (!navigator.serviceWorker) return;` guard.
+- **[FIXED] `searchLibraryNodes.js` — crash when user has no library subscriptions:** `getFilter.descendantsOfAllRoots([])` throws `'rootIds can\'t be empty'` when the `libraryIds` array is empty. Fixed with an early return guard before building the filter.
 
 ---
 
@@ -437,6 +463,7 @@ non-D&D game system using only the Library system. Results drive priority decisi
   - Watcher on `creature.gameSystem` resets active tab to 0 via Vuex store
 - **Pattern established:** SYSTEM_TABS + SYSTEM_ATTRIBUTE_SECTIONS is the standard pattern for adding new game systems. Only two maps need updating per new system.
 - **Artifacts:** `CharacterSheet.vue`, `StatsTab.vue`, `CreatureForm.vue` (Expanse options added)
+- **Note:** `CharacterSheetToolbar.vue` was NOT updated in this session; a tab-index mismatch bug was discovered and fixed in VH-004.
 
 ### VH-003: The Expanse RPG (AGE System — Character)
 
@@ -467,3 +494,19 @@ non-D&D game system using only the Library system. Results drive priority decisi
   - Multi-tab browser workflow confirmed viable: one ship sheet + one tab per crew member
 - **Pattern established:** Any crew/vehicle-based system can use the same ships-as-creatures pattern with pre-set crew stat bridges
 - **Artifacts:** `scripts/insert-expanse-ship-library.js`, `scripts/create-expanse-sample-ship.js`
+
+### VH-004: Docker Migration + End-to-End Library Insert Validation
+
+- **Date:** 2026-03-06
+- **Goal:** Migrate deployment from a LAN machine to a local Docker Compose setup; verify the Expanse library insert works end-to-end
+- **Result:** Five bugs found and fixed (see "Fixed Bugs" section above). Library insert now correctly populates character properties.
+- **Key findings:**
+  - **Two-component tab architecture (CRITICAL):** `CharacterSheet.vue` renders tab *content*, `CharacterSheetToolbar.vue` renders the *tab bar labels*. Both independently maintain `visibleTabs` computed properties. When VH-002 added `visibleTabs` to `CharacterSheet.vue` but not `CharacterSheetToolbar.vue`, the toolbar rendered 8 D&D tabs while the sheet rendered 6 Expanse tabs — clicking "Spells" (toolbar index 2) showed "Gear" (sheet index 2). Always update both files together.
+  - **Library insert root bug (CRITICAL):** After `renewDocIds`, all inserted creature properties had `root.collection: 'libraries'` instead of `root.collection: 'creatures'`. The fix (`nodes.forEach(n => { n.root = root; })`) belongs immediately after `renewDocIds` in `insertPropertyFromNode`. This was present in the original upstream codebase.
+  - **`insertPropertyFromLibraryNode.js` already handles `gameSystem` propagation:** The server-side block (lines 71–90) that copies `library.gameSystem` to the creature fires correctly during slot-fill. Tab switching is automatic once properties are inserted with correct root.
+  - **MongoDB deployment:** MONGO_URL must include both the database name and `?authSource=admin` (e.g., `mongodb://user:pass@host:27017/test?authSource=admin`). Without an explicit DB name, Meteor defaults to `test`; without `authSource=admin`, authentication fails on restart. `DEFAULT_LIBRARIES` env var must use IDs from whichever DB the app is actually connecting to.
+  - **Orphan cleanup:** Properties inserted before the root-fix can be found and deleted with `db.creatureProperties.deleteMany({'root.collection': 'libraries'})`. After cleanup, mark all creatures dirty: `db.creatures.updateMany({}, {$set: {dirty: true}})`.
+  - **Docker image vs container gotcha (CRITICAL):** `docker compose up --build` builds a new image but does NOT replace a running container. The old container continues running the old code. Always follow a rebuild with `docker compose up -d` to recreate containers with the new image. Symptom: fix is committed and image is rebuilt but behavior in the app is unchanged. Diagnosis: `docker inspect <container> --format='{{.Image}}'` and `docker images` — if the SHA on the running container doesn't match the current image, the container needs to be recreated.
+  - **Full recovery sequence after root-fix:** (1) `docker compose up -d` to swap container, (2) `db.creatureProperties.deleteMany({'root.collection': 'libraries'})` to remove orphans, (3) `db.creatures.updateMany({}, {$set: {dirty: true}})` to trigger recompute, (4) hard-refresh browser, (5) re-fill Ruleset slot on each character.
+- **Result (confirmed working):** Expanse character sheet now shows correct Skills, Attributes, and Fortune on the Character tab. Actions with dice rolls appear. The library insert correctly places all properties under `root.collection: 'creatures'`.
+- **Artifacts:** `docker-compose.yml` (MONGO_URL + DEFAULT_LIBRARIES), `serviceWorker.js`, `writeScope.js`, `searchLibraryNodes.js`, `CharacterSheetToolbar.vue`, `insertPropertyFromLibraryNode.js`

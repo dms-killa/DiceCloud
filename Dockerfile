@@ -1,24 +1,20 @@
-FROM ubuntu:jammy
+FROM node:14-bullseye
 
 USER root
 RUN adduser --system mt
 
-RUN apt-get update
-RUN apt-get install --quiet --yes curl
-RUN curl -fsSL https://deb.nodesource.com/setup_14.x | bash -
-RUN apt-get update
-RUN apt-get install --quiet --yes nodejs git
-
 USER mt
 
-RUN curl https://install.meteor.com/ | sh
+RUN curl https://install.meteor.com/?release=2.14 | sh
 
 WORKDIR /home/mt
-RUN git clone https://github.com/ThaumRystra/DiceCloud dicecloud
+RUN git clone https://github.com/dms-killa/DiceCloud dicecloud
 WORKDIR /home/mt/dicecloud/app
-RUN npm install --production
+
 ENV PATH=$PATH:/home/mt/.meteor
+RUN meteor npm install
 RUN meteor build --directory ~/dc/ --architecture os.linux.x86_64
+
 WORKDIR /home/mt/dc/bundle/programs/server
 RUN npm install
 WORKDIR /home/mt/dc/bundle

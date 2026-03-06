@@ -81,7 +81,12 @@ const insertPropertyFromLibraryNode = new ValidatedMethod({
           });
           if (library?.gameSystem) {
             Creatures.update(rootCreature._id, {
-              $set: { gameSystem: library.gameSystem },
+              $set: {
+                gameSystem: library.gameSystem,
+                // Non-D&D systems don't use D&D rest mechanics or spell slots
+                'settings.hideRestButtons': true,
+                'settings.hideSpellsTab': true,
+              },
             });
             break; // Only the first matching base ruleset wins
           }
