@@ -135,6 +135,12 @@ function insertPropertyFromNode(nodeId, root, parentId) {
     collectionMap: { 'libraryNodes': 'creatureProperties' }
   });
 
+  // renewDocIds leaves root.id pointing at the library because the library
+  // document is not in docArray. Fix all nodes to use the creature root, and
+  // wire the top-level library node into the intended parent property.
+  nodes.forEach(n => { n.root = root; });
+  node.parentId = parentId;
+
   // Mark root node as dirty
   node.dirty = true;
 
