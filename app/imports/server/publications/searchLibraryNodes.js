@@ -68,6 +68,7 @@ Meteor.publish('searchLibraryNodes', function (creatureId) {
     }
 
     // Build a filter for nodes in those libraries that match the type
+    if (!libraryIds.length) return [];
     let filter = {
       ...getFilter.descendantsOfAllRoots(libraryIds),
       removed: { $ne: true },
