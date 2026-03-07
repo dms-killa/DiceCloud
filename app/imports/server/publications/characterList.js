@@ -19,7 +19,6 @@ Meteor.publish('characterList', function () {
           { owner: userId },
           { _id: { $in: subs } },
         ],
-        type: 'pc',
       }, {
         fields: {
           name: 1,

@@ -4,7 +4,7 @@
 //
 // Usage (from HOST machine, not inside container):
 //   docker exec -i dicecloud-db mongosh \
-//     "mongodb://meteor:meteor@localhost:27017/meteor" \
+//     "mongodb://localhost:27017/test?replicaSet=rs0" \
 //     --file /path/to/this/file.js
 //
 // Or paste into an interactive mongosh session.

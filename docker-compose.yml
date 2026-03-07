@@ -5,23 +5,22 @@ services:
     image: mongo:latest
     command:
       - --storageEngine=wiredTiger
+      - --replSet=rs0
     volumes:
       - ./dicecloud/data/db:/data/db
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=meteor
-      - MONGO_INITDB_ROOT_PASSWORD=meteor
   dicecloud:
     container_name: dicecloud
     build:
       context: ./
     environment:
-    #update ROOT_URL, PORT, and MAIL_URL for your environment
       - ROOT_URL=http://mediaroom.lan:4000
-      - MONGO_URL=mongodb://meteor:meteor@dicecloud-db:27017/test?authSource=admin
+      - MONGO_URL=mongodb://dicecloud-db:27017/test?replicaSet=rs0
+      - MONGO_OPLOG_URL=mongodb://dicecloud-db:27017/local?replicaSet=rs0
       - PORT=3000
       - NODE_ENV=production
       - METEOR_SETTINGS={"public":{"environment":"production","disablePatreon":true}}
-      - MAIL_URL=smtp://EMAIL:PASSWORD@SERVER:PORT
       - DEFAULT_LIBRARIES=dslPyPFcULEH4kKOE,wAb7GUFHJpzINOjvU
+      - CONTAINER_VERSION=2026-03-07
+      - MAIL_URL=smtp://EMAIL:PASSWORD@SERVER:PORT
     ports:
-      - '4000:3000' #The internal port should match the port set in the environmental variables
+      - '4000:3000'
