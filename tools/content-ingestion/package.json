@@ -1,0 +1,20 @@
+{
+  "name": "dicecloud-content-ingestion",
+  "version": "1.0.0",
+  "description": "CLI to extract TTRPG stat blocks from PDFs using an LLM and generate DiceCloud mongosh insert scripts",
+  "type": "commonjs",
+  "main": "ingest.js",
+  "scripts": {
+    "ingest": "node ingest.js"
+  },
+  "dependencies": {
+    "pdf-parse": "^1.1.1"
+  },
+  "optionalDependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "openai": "^4.77.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
